@@ -13,20 +13,19 @@ rededge = pd.read_excel('/home/at15963/Dropbox/work/black_and_bloom/multispectra
 	sheet_name='RedEdge')
 wvl_centers = rededge.central
 wvls = pd.DataFrame({'low':wvl_centers, 'high':wvl_centers})
-HCRF_file = '/scratch/field_spectra/HCRF_master.csv'
+HCRF_file = '/scratch/field_spectra/HCRF_master_machine_snicar.csv'
 HCRF_classes = '/home/at15963/Dropbox/work/data/field_spectra_classes.csv'
-spectra = xarray_classify.load_hcrf_data(HCRF_file, HCRF_classes, wvls)
+spectra = xarray_classify.load_hcrf_data(HCRF_file, wvls, hcrf_classes=HCRF_classes)
 
 # Split dataset and train classifier
 train_X, train_Y, test_X, test_Y = xarray_classify.train_test_split(spectra)
 clf_RF = xarray_classify.train_RF(train_X, train_Y)
 
-# Classify data
-uav20 = xr.open_dataset('uav_20170720_refl_5cm.nc',chunks={'x':1000,'y':1000}) 
-b_ix = pd.Index([1,2,3,4,5],name='b') 
-concat = xr.concat([uav20.Band1, uav20.Band2, uav20.Band3, uav20.Band4, uav20.Band5], b_ix)
-# Just look at a subset area in this case (slice)
-predicted = xarray_classify.classify_dataset(concat.isel(x=slice(3000,3500),y=slice(3000,3500)), clf_RF)
+xarray_classify.test_performance(clf_RF, spectra, train_X, train_Y, test_X, test_Y)
+
+# Save classifier
+xarray_classify.save_classifier(clf_RF, '/scratch/UAV/clf_RF_RedEdge.pkl')
+
 
 """
 https://gist.github.com/jakevdp/8a992f606899ac24b711
@@ -45,5 +44,13 @@ plt.clim(-0.5, 2.5)
 """
 
 # Lookup table of text label vs numeric label
-labs = spectra.filter(items=['numeric_label','label'])
-labs.groupby('label').mean()
+# labs = spectra.filter(items=['numeric_label','label'])
+# labs.groupby('label').mean()
+
+# figure(),predicted.plot(cmap=plt.cm.get_cmap('viridis', 6))
+
+# next up - pickle classifier so it can be re-used between images
+
+# def calculate_albedo(band):
+#     # create albedo array by applying Knap (1999) narrowband - broadband conversion
+#     albedo_array = np.array([0.726*(arrays[1]-0.18) - 0.322*(arrays[1]-0.18)**2 - 0.015*(arrays[4]-0.2) + 0.581*(arrays[4]-0.2)])
