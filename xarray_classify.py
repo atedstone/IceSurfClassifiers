@@ -21,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from timeit import default_timer as tic
 
 
-def load_hcrf_data(hcrf_file, hcrf_classes, wvls):
+def load_hcrf_data(hcrf_file, wvls, hcrf_classes=None):
 	"""
 	Load HCRF data corresponding to requested multispectral bands
 
@@ -39,9 +39,6 @@ def load_hcrf_data(hcrf_file, hcrf_classes, wvls):
 
 	hcrf_master = pd.read_csv(hcrf_file, index_col=0)
 	hcrf_master.index = np.arange(350,2500,1)
-	hcrf_class = pd.read_csv(hcrf_classes, index_col=0)
-	# Remove errant leading/trailing spaces
-	hcrf_class.index = pd.Index([v.strip() for v in hcrf_class.index])
 
 	# Create column for each multispectral band
 	store = []
@@ -60,20 +57,30 @@ def load_hcrf_data(hcrf_file, hcrf_classes, wvls):
 	# Concatenate to df
 	df = pd.concat(store, axis=1)
 
-	# Add surface classifications
-	df = df.join(hcrf_class)
+	# Add surface classifications if requested
+	# (these are needed for scikit-learn-based label classification)
+	print(hcrf_classes)
+	if hcrf_classes is not None:
 
-	# Remove (1) unclassified spectra and (2) classified spectra missing associated data
-	df2 = df[~pd.isnull(df.numeric_label)]
+		if type(hcrf_classes) is str:
+			hcrf_class = pd.read_csv(hcrf_classes, index_col=0)
+		else:
+			hcrf_class = hcrf_classes
+		# Remove errant leading/trailing spaces
+		hcrf_class.index = pd.Index([v.strip() for v in hcrf_class.index])
+		df = df.join(hcrf_class)
+
+		# Remove (1) unclassified spectra and (2) classified spectra missing associated data
+		df = df[~pd.isnull(df.numeric_label)]
 
 	# Add 'unknown' option to training set
 	d = {}
-	for col in df2.filter(like='R').columns:
+	for col in df.filter(like='R').columns:
 		d[col] = 0
-	d['label'] = 'UNKNOWN'
-	d['numeric_label'] = 0
-
-	spectra = pd.concat([df2, pd.DataFrame(d, index=['unknown'])], axis=0)
+	if hcrf_classes is not None:
+		d['label'] = 'UNKNOWN'
+		d['numeric_label'] = 0
+	spectra = pd.concat([df, pd.DataFrame(d, index=['unknown'])], axis=0)
 	spectra = spectra[pd.notnull(spectra)]
 	spectra = spectra.dropna()
 
@@ -112,7 +119,7 @@ def train_RF(X_train_xr, Y_train_xr):
 	"""
 
 	clf_RF = sklearn_xarray.wrap(
-	    RandomForestClassifier(n_estimators=1000, max_leaf_nodes=16), 
+	    RandomForestClassifier(n_estimators=1000, max_leaf_nodes=16, n_jobs=-1), 
 	    sample_dim='samples', reshapes='b')
 
 	clf_RF.fit(X_train_xr, Y_train_xr)
