@@ -17,7 +17,7 @@ import sklearn_xarray
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn import cross_validation
+from sklearn import model_selection
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, recall_score, f1_score, precision_score
 from timeit import default_timer as tic
@@ -104,7 +104,7 @@ def train_test_split(spectra, test_size=0.2):
     # Split into test and train datasets
     features = spectra.drop(labels=['label', 'numeric_label'], axis=1)
     labels = spectra.filter(items=['numeric_label'])
-    X_train, X_test, Y_train, Y_test = cross_validation.train_test_split(features, labels, 
+    X_train, X_test, Y_train, Y_test = model_selection.train_test_split(features, labels, 
         test_size=test_size)
 
     # Convert training and test datasets to DataArrays
@@ -124,7 +124,7 @@ def train_RF(X_train_xr, Y_train_xr):
     """
 
     clf_RF = sklearn_xarray.wrap(
-        RandomForestClassifier(n_estimators=1000, max_leaf_nodes=16, n_jobs=-1), 
+        RandomForestClassifier(n_estimators=1000, max_leaf_nodes=16, n_jobs=5), 
         sample_dim='samples', reshapes='b')
 
     clf_RF.fit(X_train_xr, Y_train_xr)
