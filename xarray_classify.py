@@ -91,7 +91,7 @@ def load_hcrf_data(hcrf_file, wvls, hcrf_classes=None):
 
 
 
-def train_test_split(spectra, test_size=0.2):
+def train_test_split(spectra, test_size=0.3):
     """ Split spectra into training and testing data sets
 
     Arguments:
