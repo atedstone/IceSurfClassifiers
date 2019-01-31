@@ -17,6 +17,8 @@ import sklearn_xarray
 import numpy as np
 import matplotlib.pyplot as plt
 
+import sys
+
 from sklearn import model_selection
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, recall_score, f1_score, precision_score
@@ -83,7 +85,10 @@ def load_hcrf_data(hcrf_file, wvls, hcrf_classes=None):
     if hcrf_classes is not None:
         d['label'] = 'UNKNOWN'
         d['numeric_label'] = 0
-    spectra = pd.concat([df, pd.DataFrame(d, index=['unknown'])], axis=0)
+    s = {}
+    for i in np.arange(0,20):
+        s[i] = d
+    spectra = pd.concat([df, pd.DataFrame.from_dict(s, orient='index')], axis=0)
     spectra = spectra[pd.notnull(spectra)]
     spectra = spectra.dropna()
 
@@ -91,7 +96,7 @@ def load_hcrf_data(hcrf_file, wvls, hcrf_classes=None):
 
 
 
-def train_test_split(spectra, test_size=0.3):
+def train_test_split(spectra, test_size=0.3, log_file=None):
     """ Split spectra into training and testing data sets
 
     Arguments:
@@ -113,6 +118,25 @@ def train_test_split(spectra, test_size=0.3):
     X_test_xr = xr.DataArray(X_test, dims=('samples','b'), coords={'b':features.columns})
     Y_test_xr = xr.DataArray(Y_test, dims=('samples','numeric_label'))
 
+    if log_file is not None:
+        print('TEST/TRAIN SPLIT INFORMATION', file=log_file)
+        
+        aspd = Y_train_xr.to_dataframe(name='train').squeeze()
+        print('Samples per class... Training', file=log_file)
+        print(aspd.groupby(aspd).count(), file=log_file)
+        print('', file=log_file)
+
+        aspd = Y_test_xr.to_dataframe(name='test').squeeze()
+        print('Samples per class... Testing', file=log_file)
+        print(aspd.groupby(aspd).count(), file=log_file)
+        print('', file=log_file)        
+
+        print('List of training samples:', file=log_file)
+        print(Y_train_xr.samples, file=log_file)
+        print('List of testing samples:', file=log_file)
+        print(Y_test_xr.samples, file=log_file)
+        print('\n\n', file=log_file)
+
     return X_train_xr, Y_train_xr, X_test_xr, Y_test_xr
 
 
@@ -124,7 +148,7 @@ def train_RF(X_train_xr, Y_train_xr):
     """
 
     clf_RF = sklearn_xarray.wrap(
-        RandomForestClassifier(n_estimators=1000, max_leaf_nodes=16, n_jobs=5), 
+        RandomForestClassifier(n_estimators=32, max_leaf_nodes=None, n_jobs=-1), 
         sample_dim='samples', reshapes='b')
 
     clf_RF.fit(X_train_xr, Y_train_xr)
@@ -133,7 +157,16 @@ def train_RF(X_train_xr, Y_train_xr):
 
 
 
-def test_performance(clf, X, X_train_xr, Y_train_xr, X_test_xr, Y_test_xr):
+def test_performance(clf, X, X_train_xr, Y_train_xr, X_test_xr, Y_test_xr, 
+    plot_confmx=False, log_file=sys.stdout):
+    """
+    Test performance of trained classifier against test dataset.
+
+    Returns:
+    tuple (confusion matrix, normalised confusion matrix)
+
+    """
+
     accuracy = clf.score(X_train_xr, Y_train_xr) #calculate accuracy
     Y_predict = clf.predict(X_train_xr) # make nre prediction
     conf_mx = confusion_matrix(Y_train_xr, Y_predict) # calculate confusion matrix
@@ -142,26 +175,44 @@ def test_performance(clf, X, X_train_xr, Y_train_xr, X_test_xr, Y_test_xr):
     precision = precision_score(Y_train_xr, Y_predict, average='weighted')
     average_metric = (accuracy + recall + f1) / 3
 
-    print('Accuracy = ',accuracy, 'F1_Score = ', f1, 'Recall = ', recall, 'Precision = ', precision)
-    plt.figure()    
-    plt.imshow(conf_mx)
-    plt.title('Model Confusion matrix')
-    plt.colorbar()
-    classes = clf.estimator_.classes_
-    tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
+    print('Accuracy = ',accuracy, file=log_file)
+    print('F1_Score = ', f1, file=log_file)
+    print('Recall = ', recall, file=log_file)
+    print('Precision = ', precision, file=log_file)
 
-    Y_test_predicted = clf.predict(X_test_xr)
-    final_conf_mx = confusion_matrix(Y_test_xr, Y_test_predicted)
+    if plot_confmx:
+        plt.figure()    
+        plt.imshow(conf_mx)
+        plt.title('Model Confusion matrix')
+        plt.colorbar()
+        classes = clf.estimator_.classes_
+        tick_marks = np.arange(len(classes))
+        plt.xticks(tick_marks, classes, rotation=45)
+        plt.yticks(tick_marks, classes)
+
+    # Calculate normalised confusion matrix
+    row_sums = conf_mx.sum(axis=1, keepdims=True)
+    norm_conf_mx = conf_mx / row_sums
+    np.fill_diagonal(norm_conf_mx, 0)
+
+    # Print confusion matrices
+    print('', file=log_file)
+    print('Confusion matrix:', file=log_file)
+    print(conf_mx, file=log_file)
+    print('', file=log_file)
+    print('Normalised Confusion matrix:', file=log_file)
+    print(norm_conf_mx, file=log_file)
 
      # The Feature importances 
-    print()
-    print('Feature Importances')
-    print('(relative importance of each feature (wavelength) for prediction)')
-    print()
+    print('', file=log_file)
+    print('Feature Importances', file=log_file)
+    print('(relative importance of each feature (wavelength) for prediction)', file=log_file)
+    print('', file=log_file)
     for name, score in zip(X.columns, clf.estimator_.feature_importances_):
-        print (name,score)
+        print (name,score, file=log_file)
+
+    return(conf_mx, norm_conf_mx)
+
 
 
 def classify_dataset(ds, clf):
@@ -169,7 +220,7 @@ def classify_dataset(ds, clf):
     Classify a dataset using a trained classifier
 
     Arguments:
-    ds : xarray dataset with coordinates b, y, x (where b will be reduced)
+    ds : xarray dataArray with coordinates b, y, x (where b will be reduced)
     clf : a trained classifier
 
     Returns:
@@ -178,19 +229,20 @@ def classify_dataset(ds, clf):
     """
 
     ### Prediction phase
-    stacked = ds.stack(allpoints=['y','x'])
+    stacked = ds.stack(samples=['y','x'])
     # DataArray 'matrix' needs to have exactly the same layout/labels as the training DataArray.
-    stackedT = stacked.T
-    stackedT = stackedT.rename({'allpoints':'samples'})
+    stacked = stacked.chunk(chunks={'samples':2000*2000, 'b':5}).T
     # Only do prediction on points where there are data
-    stackedT = stackedT.where(stackedT.sum(dim='b') > 0).dropna(dim='samples')
+    stacked = stacked.where(stacked.sum(dim='b') > 0, other=0) #.dropna(dim='samples')
 
     t1 = tic()
-    pred = clf.predict(stackedT).compute()
-    print('Time taken (seconds): ', tic()-t1)
+    pred = clf.predict(stacked)
+    print('Time taken to predict (seconds): ', tic()-t1)
 
     # Unstack back to x,y grid
+    t2 = tic()
     predu = pred.unstack(dim='samples')
+    print('Time taken to unstack (seconds):', tic()-t2)
 
     return predu
 
