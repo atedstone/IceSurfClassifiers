@@ -6,36 +6,29 @@ from osgeo import gdal, osr
 import numpy as np
 import georaster
 
-# Stats for classifier in use
-#Accuracy =  0.952380952381 F1_Score =  0.949801013523 Recall =  0.952380952381 Precision =  0.950284090909
-""" For RedEdge_snicarsnow.pkl
-Accuracy =  0.940217391304 F1_Score =  0.934766392673 Recall =  0.940217391304 Precision =  0.942895709008
+from timeit import default_timer as tic
 
-Feature Importances
-(relative importance of each feature (wavelength) for prediction)
 
-R475 0.233517596955
-R560 0.260483344995
-R668 0.20433026048
-R717 0.152076480941
-R840 0.149592316629
-"""
-clf_RF = joblib.load('/scratch/UAV/clf_RF_RedEdge_snicarsnow.pkl')
+clf_id = '20190130_171930'
+clf_RF = joblib.load('/scratch/UAV/L3/classifiers/clf_RF_RedEdge_snicarsnow_' + clf_id + '.pkl')
+
+output_path = '/scratch/UAV/L3/'
 
 fn_path = '/scratch/UAV/uav2017_commongrid_bandcorrect/'
 flights = {
-'20170715':'uav_20170715_refl_5cm_commongrid.nc',
-'20170720':'uav_20170720_refl_5cm_commongrid.nc',
-'20170721':'uav_20170721_refl_5cm_commongrid.nc',
-'20170722':'uav_20170722_refl_5cm_commongrid.nc',
-'20170723':'uav_20170723_refl_5cm_commongrid.nc',
-'20170724':'uav_20170724_refl_5cm_commongrid.nc'
+'20170715':'uav_20170715_refl_5cm_commongrid.tif_epsg32622.nc',
+'20170720':'uav_20170720_refl_5cm_commongrid.tif_epsg32622.nc',
+'20170721':'uav_20170721_refl_5cm_commongrid.tif_epsg32622.nc',
+'20170722':'uav_20170722_refl_5cm_commongrid.tif_epsg32622.nc',
+'20170723':'uav_20170723_refl_5cm_commongrid.tif_epsg32622.nc',
+'20170724':'uav_20170724_refl_5cm_commongrid.tif_epsg32622.nc'
 }
+#flights = {'20170721':'uav_20170721_refl_5cm_commongrid.nc'}
 
-fn_path = '/scratch/UAV/photoscan_outputs_2018/'
-flights = {
-	'20180724_PM':'uav_20180724_PM_refl.nc'
-}
+# fn_path = '/scratch/UAV/photoscan_outputs_2018/'
+# flights = {
+# 	'20180724_PM':'uav_20180724_PM_refl.nc'
+#}
 
 setup = False
 
@@ -59,7 +52,7 @@ for flight in flights:
 
 	concat = xr.concat([uav.Band1, uav.Band2, uav.Band3, uav.Band4, uav.Band5], b_ix)
 	# Mask nodata areas
-	concat = concat.where(concat.sum(dim='b') > 0)
+	#concat = concat.where(concat.sum(dim='b') > 0)
 
 	predicted = xarray_classify.classify_dataset(concat, clf_RF)
 
@@ -69,7 +62,9 @@ for flight in flights:
 	# Calculate albedo
 	#uav = uav.isel(x=slice(3000,3500),y=slice(3000,3500))
 	#albedo = 0.726*(uav['Band2']-0.18) - 0.322*(uav['Band2']-0.18)**2 - 0.015*(uav['Band4']-0.2) + 0.581*(uav['Band4']-0.2)
+	t1 = tic()
 	albedo = 0.726*uav['Band2'] - 0.322*uav['Band2']**2 - 0.015*uav['Band4'] + 0.581*uav['Band4']
+	print('xarray albedo (seconds): ', tic()-t1)	
 
 	# Save outputs
 
@@ -121,11 +116,13 @@ for flight in flights:
 	albedo.attrs['units'] = 'dimensionless'
 	albedo.attrs['grid_mapping'] = 'universal_transverse_mercator'
 
+	t2 = tic()
 	ds = xr.Dataset({'classified':predicted,
 		'albedo':albedo,
 		'universal_transverse_mercator':crs,
 		'lon':lon_da,
 		'lat':lat_da})
+	print('Dataset generation (seconds):', tic()-t2)
 
 	ds = ds.transpose('y','x')
 
@@ -153,20 +150,24 @@ for flight in flights:
 	ds.y.attrs['point_spacing'] = 'even'
 	ds.y.attrs['axis'] = 'y'
 
-	save_fn = flights[flight][:-3] + '_class.nc'
-	ds.to_netcdf('%s%s' %(fn_path, save_fn), format='NetCDF4')
+	save_fn = flights[flight][:-3] + '_class_clf' + clf_id + '.nc'
+	t3 = tic()
+	ds.to_netcdf('%s%s' %(output_path, save_fn), format='NetCDF4')
+	print('netcdf output (seconds):',tic()-t3)
 
 	ds = None
 
+	t4 = tic()
 	alb_gr = uav_gr
 	alb_gr.r = np.flipud(albedo.values)
-	save_fn = flights[flight][:-3] + '_albedo.tif'
-	alb_gr.save_geotiff('%s%s' %(fn_path, save_fn))
+	save_fn = flights[flight][:-3] + '_albedo_clf' + clf_id + '.tif'
+	alb_gr.save_geotiff('%s%s' %(output_path, save_fn))
 
 	clas_gr = uav_gr
 	clas_gr.r = np.flipud(predicted.values)
-	save_fn = flights[flight][:-3] + '_classified.tif'
-	clas_gr.save_geotiff('%s%s' %(fn_path, save_fn))	
+	save_fn = flights[flight][:-3] + '_cla_clf_' + clf_id + '.tif'
+	clas_gr.save_geotiff('%s%s' %(output_path, save_fn))	
+	print('Geotiff output (seconds):', tic()-t4)
 
 	alb_gr = None
 	clas_gr = None
