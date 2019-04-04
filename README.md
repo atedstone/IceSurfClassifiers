@@ -4,3 +4,6 @@ This repositorey contains code in active development for automated classificatio
 
 There are no permissions associated with this code, it is unpublished and still under development. please do not use without permission.
 
+## To Do
+
+* Add option to save list of training versus test data, so that performance of a pickled classifier can be verified independently subsequently.

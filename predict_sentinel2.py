@@ -20,14 +20,14 @@ R668 0.20433026048
 R717 0.152076480941
 R840 0.149592316629
 """
-clf_RF = joblib.load('/scratch/UAV/clf_RF_Sentinel2_20m_snicarsnow.pkl')
+clf_RF = joblib.load('/scratch/UAV/L3/classifiers/clf_RF_Sentinel2_snicarsnow_20190305_170648.pkl')
 #clf_RF = joblib.load('/home/at15963/S2/clf_RF_Sentinel2_20m_snicarsnow.pkl')
 
 fn_path = '/home/at15963/projects/uav/data/S2/'
 #fn_path = '/scratch/atlantis1/at15963/L0data/S2/'
 images = {
-#'20170720':'S2A_MSIL2A_20170720T145921_N0205_R125_T22WEV_20170720T150244.SAFE_20m/S2A_MSIL2A_20170720T145921_N0205_R125_T22WEV_20170720T150244_20m.data/'
-'20170721':'S2B_MSIL2A_20170721T151909_N0205_R068_T22WEV_20170721T152003.SAFE_20m/S2B_MSIL2A_20170721T151909_N0205_R068_T22WEV_20170721T152003_20m.data/'
+'20170720':'S2A_MSIL2A_20170720T145921_N0205_R125_T22WEV_20170720T150244.SAFE_20m/S2A_MSIL2A_20170720T145921_N0205_R125_T22WEV_20170720T150244_20m.data/'
+#'20170721':'S2B_MSIL2A_20170721T151909_N0205_R068_T22WEV_20170721T152003.SAFE_20m/S2B_MSIL2A_20170721T151909_N0205_R068_T22WEV_20170721T152003_20m.data/'
 }
 
 setup = False
@@ -123,7 +123,7 @@ for image in images:
 		crs.attrs['latitude_of_projection_origin'] = srs.GetProjParm('latitude_of_origin')
 
 		## Create associated lat/lon coordinates DataArrays
-		uav_gr = georaster.SingleBandRaster(fn_path+images['20170721']+'B2.img',
+		uav_gr = georaster.SingleBandRaster(fn_path+images['20170720']+'B2.img',
 			load_data=False)
 		grid_lon, grid_lat = uav_gr.coordinates(latlon=True)
 		#uav = xr.open_dataset(fn_path + images['20160720'],chunks={'x':1000,'y':1000}) 
@@ -188,19 +188,19 @@ for image in images:
 	ds.y.attrs['point_spacing'] = 'even'
 	ds.y.attrs['axis'] = 'y'
 
-	save_fn = 'S2_20170721_class.nc'
+	save_fn = 'S2_20170720_class_clf20190305_170648.nc'
 	ds.to_netcdf('%s%s' %(fn_path, save_fn), format='NetCDF4')
 
 	ds = None
 
 	alb_gr = uav_gr
 	alb_gr.r = np.flipud(albedo.values)
-	save_fn = 'S2_20170721_albedo.tif'
+	save_fn = 'S2_20170720_albedo_clf20190305_170648.tif'
 	alb_gr.save_geotiff('%s%s' %(fn_path, save_fn))
 
 	clas_gr = uav_gr
 	clas_gr.r = np.flipud(predicted.values)
-	save_fn = 'S2_20170721_classified.tif'
+	save_fn = 'S2_20170720_classified_clf20190305_170648.tif'
 	clas_gr.save_geotiff('%s%s' %(fn_path, save_fn))	
 
 	alb_gr = None

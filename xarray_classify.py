@@ -167,14 +167,15 @@ def test_performance(clf, X, X_train_xr, Y_train_xr, X_test_xr, Y_test_xr,
 
     """
 
-    accuracy = clf.score(X_train_xr, Y_train_xr) #calculate accuracy
-    Y_predict = clf.predict(X_train_xr) # make nre prediction
-    conf_mx = confusion_matrix(Y_train_xr, Y_predict) # calculate confusion matrix
-    recall = recall_score(Y_train_xr, Y_predict, average="weighted")
-    f1 = f1_score(Y_train_xr, Y_predict, average="weighted") # calculate f1 score
-    precision = precision_score(Y_train_xr, Y_predict, average='weighted')
+    accuracy = clf.score(X_test_xr, Y_test_xr) #calculate accuracy
+    Y_predict = clf.predict(X_test_xr) # make nre prediction
+    conf_mx = confusion_matrix(Y_test_xr, Y_predict) # calculate confusion matrix
+    recall = recall_score(Y_test_xr, Y_predict, average="weighted")
+    f1 = f1_score(Y_test_xr, Y_predict, average="weighted") # calculate f1 score
+    precision = precision_score(Y_test_xr, Y_predict, average='weighted')
     average_metric = (accuracy + recall + f1) / 3
 
+    print('PERFORMANCE ON TEST SET', file=log_file)
     print('Accuracy = ',accuracy, file=log_file)
     print('F1_Score = ', f1, file=log_file)
     print('Recall = ', recall, file=log_file)

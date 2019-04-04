@@ -6,6 +6,7 @@ Author: Andrew Tedstone (a.j.tedstone@bristol.ac.uk)
 """
 import pandas as pd
 import xarray as xr
+import datetime as dt
 import xarray_classify
 
 # Load ground reflectance spectra corresponding to red-edge sensor
@@ -18,14 +19,22 @@ HCRF_file = '/scratch/field_spectra/HCRF_master_machine_snicar.csv'
 HCRF_classes = '/home/at15963/Dropbox/work/data/field_spectra_classes.csv'
 spectra = xarray_classify.load_hcrf_data(HCRF_file, wvls, hcrf_classes=HCRF_classes)
 
-# Split dataset and train classifier
-train_X, train_Y, test_X, test_Y = xarray_classify.train_test_split(spectra)
-clf_RF = xarray_classify.train_RF(train_X, train_Y)
+clf_fn = '/scratch/UAV/L3/classifiers/clf_RF_Sentinel2_snicarsnow_' + dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+with open(clf_fn + '.txt', 'w') as log_file:
+	# Split dataset and train classifier
+	train_X, train_Y, test_X, test_Y = xarray_classify.train_test_split(spectra, 
+		log_file=log_file)
+	clf_RF = xarray_classify.train_RF(train_X, train_Y)
 
-xarray_classify.test_performance(clf_RF, spectra, train_X, train_Y, test_X, test_Y)
+
+	conf_mx, norm_mx = xarray_classify.test_performance(clf_RF, spectra, 
+		train_X, train_Y, test_X, test_Y,
+		log_file=log_file)
 
 # Save classifier
-#xarray_classify.save_classifier(clf_RF, '/scratch/UAV/clf_RF_Sentinel2_20m_snicarsnow.pkl')
+xarray_classify.save_classifier(clf_RF, clf_fn + '.pkl')
+
+
 
 
 """

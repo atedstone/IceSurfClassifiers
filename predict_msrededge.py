@@ -16,19 +16,19 @@ output_path = '/scratch/UAV/L3/'
 
 fn_path = '/scratch/UAV/uav2017_commongrid_bandcorrect/'
 flights = {
-'20170715':'uav_20170715_refl_5cm_commongrid.tif_epsg32622.nc',
-'20170720':'uav_20170720_refl_5cm_commongrid.tif_epsg32622.nc',
-'20170721':'uav_20170721_refl_5cm_commongrid.tif_epsg32622.nc',
-'20170722':'uav_20170722_refl_5cm_commongrid.tif_epsg32622.nc',
-'20170723':'uav_20170723_refl_5cm_commongrid.tif_epsg32622.nc',
-'20170724':'uav_20170724_refl_5cm_commongrid.tif_epsg32622.nc'
+'20170715':'uav_20170715_refl_5cm_commongrid_epsg32622_bilinear.nc',
+'20170720':'uav_20170720_refl_5cm_v2_epsg32622native_commongrid.nc',
+'20170721':'uav_20170721_refl_5cm_epsg32622native_commongrid.nc',
+'20170722':'uav_20170722_refl_5cm_commongrid_epsg32622_bilinear.nc',
+'20170723':'uav_20170723_refl_5cm_commongrid_epsg32622_bilinear.nc',
+'20170724':'uav_20170724_refl_5cm_commongrid_epsg32622_bilinear.nc'
 }
-#flights = {'20170721':'uav_20170721_refl_5cm_commongrid.nc'}
+
 
 # fn_path = '/scratch/UAV/photoscan_outputs_2018/'
 # flights = {
 # 	'20180724_PM':'uav_20180724_PM_refl.nc'
-#}
+# }
 
 setup = False
 
@@ -71,7 +71,7 @@ for flight in flights:
 	if not setup:
 		# Define projection
 		srs = osr.SpatialReference()
-		srs.ImportFromProj4('+init=epsg:32623')
+		srs.ImportFromProj4('+init=epsg:32622')
 		crs = xr.DataArray(0, encoding={'dtype':np.dtype('int8')})
 		crs.attrs['projected_crs_name'] = srs.GetAttrValue('projcs')
 		crs.attrs['grid_mapping_name'] = 'universal_transverse_mercator'
@@ -111,7 +111,7 @@ for flight in flights:
 	predicted.attrs['key'] = 'Unknown:0; Water:1; Snow:2; Clean Ice:3; Light Algae on Ice:4; Heavy Algae on Ice:5; Cryoconite:6' ## FIX !!
 	predicted.attrs['grid_mapping'] = 'universal_transverse_mercator'
 
-	albedo.encoding = {'dtype':'int16', 'scale_factor':0.01, 'zlib':True, '_FillValue':-9999}
+	albedo.encoding = {'dtype':'int16', 'scale_factor':0.001, 'zlib':True, '_FillValue':-9999}
 	albedo.name = 'Surface albedo computed after Knap et al. (1999) narrowband-to-broadband conversion'
 	albedo.attrs['units'] = 'dimensionless'
 	albedo.attrs['grid_mapping'] = 'universal_transverse_mercator'
@@ -165,9 +165,14 @@ for flight in flights:
 
 	clas_gr = uav_gr
 	clas_gr.r = np.flipud(predicted.values)
-	save_fn = flights[flight][:-3] + '_cla_clf_' + clf_id + '.tif'
+	save_fn = flights[flight][:-3] + '_cla_clf' + clf_id + '.tif'
 	clas_gr.save_geotiff('%s%s' %(output_path, save_fn))	
 	print('Geotiff output (seconds):', tic()-t4)
 
 	alb_gr = None
 	clas_gr = None
+
+	uav = None
+	concat = None
+	albedo = None
+	predicted = None
